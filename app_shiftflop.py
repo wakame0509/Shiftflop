@@ -1,55 +1,47 @@
 import streamlit as st
-import random
 from calculate_winrate_detailed_v2 import simulate_winrate_for_flop_type
-from feature_extractor import extract_flop_features
-from preflop_winrate_dict import preflop_winrates
-from utils import expand_hand_to_specific_cards, format_flop
+from hand_list import all_starting_hands  # 169通りのハンド
+from flop_type_generator import generate_candidate_flops
+import random
 
-# ==== UI構成 ====
-st.title("ShiftFlop 勝率変動ランキング")
-st.write("プリフロップからフロップでどのように勝率が変化するかを分析します。")
+st.title("ShiftFlop - フロップによる勝率変動")
 
-# --- ハンド選択 ---
-hand_options = list(preflop_winrates.keys())
-hero_hand_name = st.selectbox("ヒーローのハンドを選択", hand_options)
+# 自分のハンド選択（169通り）
+hand = st.selectbox("自分のハンドを選択", all_starting_hands)
 
-# --- フロップタイプ選択 ---
+# フロップタイプの選択
 flop_type = st.selectbox("フロップタイプを選択", [
-    "High Card Rainbow",
-    "Paired Board",
-    "Suited Two Tone",
-    "Connected Low",
-    "1 Hit + 2 Flush Draw",
-    "No Hit",
-    "Straight Possible"
+    "High card rainbow",
+    "Low connected rainbow",
+    "Paired board",
+    "Two-tone board",
+    "Monotone board",
+    "Ace-high dry",
+    "Broadway coordinated"
 ])
 
-# --- 試行回数 ---
-num_trials = st.selectbox("モンテカルロ試行回数", [1000, 10000, 50000, 100000])
+# モンテカルロ試行回数の選択（1回あたりのフロップサンプル数）
+sample_count = st.selectbox("フロップのサンプル数（モンテカルロ的に抽出）", [10, 20, 30, 40, 50])
 
-# --- 実行ボタン ---
-if st.button("ShiftFlop を実行"):
+# 開始ボタン
+if st.button("計算開始"):
     with st.spinner("計算中..."):
-        hero_cards = expand_hand_to_specific_cards(hero_hand_name)
-        results = simulate_winrate_for_flop_type(
-            hero_cards, flop_type, num_trials=num_trials, sample_per_trial=10
-        )
+        # 指定されたフロップタイプに対して候補を全生成
+        candidate_flops = generate_candidate_flops(hand, flop_type)
 
-        preflop_wr = preflop_winrates[hero_hand_name]
+        # ランダムにN個抽出
+        if len(candidate_flops) < sample_count:
+            st.warning("候補が少ないため全てのフロップを使用します")
+            selected_flops = candidate_flops
+        else:
+            selected_flops = random.sample(candidate_flops, sample_count)
 
-        # 勝率差の大きい順にソート
-        results_sorted = sorted(results, key=lambda x: abs(x["winrate"] - preflop_wr), reverse=True)[:10]
+        # 各フロップに対して勝率を計算し、差分を平均
+        deltas = []
+        for flop in selected_flops:
+            delta = simulate_winrate_for_flop_type(hand, flop)
+            deltas.append(delta)
 
-        st.subheader("勝率変動ランキング（トップ10）")
-        for item in results_sorted:
-            flop_str = format_flop(item["flop"])
-            shift = round(item["winrate"] - preflop_wr, 2)
-            feature = extract_flop_features("".join(hero_cards), item["flop"])
-            st.markdown(f"""
-                <div class='report'>
-                <b>Flop:</b> {flop_str}  
-                <b>Winrate:</b> {item["winrate"]:.1f}%  
-                <b>Shift:</b> {shift:+.2f}%  
-                <b>Features:</b> {feature}
-                </div>
-            """, unsafe_allow_html=True)
+        avg_delta = sum(deltas) / len(deltas)
+        sign = "+" if avg_delta >= 0 else ""
+        st.success(f"平均的な勝率の変動: {sign}{avg_delta:.2f}%（{sample_count}サンプル平均）")
