@@ -1,0 +1,31 @@
+/* style.css - 最小限の装飾 */
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #f9f9f9;
+}
+
+h1, h2 {
+    color: #333333;
+}
+
+.report {
+    font-size: 14px;
+    color: #444444;
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #dddddd;
+    margin-top: 10px;
+}
+
+.stButton>button {
+    background-color: #1f77b4;
+    color: white;
+    border-radius: 4px;
+    padding: 0.5em 1em;
+}
+
+.stButton>button:hover {
+    background-color: #155a8a;
+}
